@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF.js Viewer</title>
+    <!-- Load PDF.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        #pdf-container {
+            width: 100%;
+            height: 80vh;
+            border: 1px solid #ccc;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        #pdf-toolbar {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>PDF.js Viewer</h1>
+    <div id="pdf-toolbar">
+        <button id="prev-page">Previous</button>
+        <span id="page-num">Page: 1</span>
+        <button id="next-page">Next</button>
+        <input type="range" id="page-slider" min="1" max="1" value="1" style="flex-grow: 1;">
+    </div>
+    <div id="pdf-container"></div>
+
+    <script>
+        // Initialize PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        // Load the PDF
+        const pdfPath = 'filename.pdf'; // PDF file in the same folder
+        let pdfDoc = null;
+        let currentPage = 1;
+        let numPages = 0;
+
+        // Load PDF document
+        pdfjsLib.getDocument(pdfPath).promise.then(function(pdf) {
+            pdfDoc = pdf;
+            numPages = pdfDoc.numPages;
+            document.getElementById('page-slider').max = numPages;
+
+            // Render the first page
+            renderPage(currentPage);
+
+            // Update UI
+            document.getElementById('page-num').textContent = `Page: ${currentPage} of ${numPages}`;
+        }).catch(function(error) {
+            console.error("Error loading PDF:", error);
+            document.getElementById('pdf-container').innerHTML = `<p style="color: red;">Failed to load PDF. Error: ${error.message}</p>`;
+        });
+
+        // Render a specific page
+        function renderPage(pageNum) {
+            pdfDoc.getPage(pageNum).then(function(page) {
+                const viewport = page.getViewport({ scale: 1.5 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                document.getElementById('pdf-container').innerHTML = '';
+                document.getElementById('pdf-container').appendChild(canvas);
+
+                page.render({
+                    canvasContext: context,
+                    viewport: viewport
+                });
+            });
+        }
+
+        // Navigation buttons
+        document.getElementById('prev-page').addEventListener('click', function() {
+            if (currentPage > 1) {
+                currentPage--;
+                renderPage(currentPage);
+                document.getElementById('page-num').textContent = `Page: ${currentPage} of ${numPages}`;
+                document.getElementById('page-slider').value = currentPage;
+            }
+        });
+
+        document.getElementById('next-page').addEventListener('click', function() {
+            if (currentPage < numPages) {
+                currentPage++;
+                renderPage(currentPage);
+                document.getElementById('page-num').textContent = `Page: ${currentPage} of ${numPages}`;
+                document.getElementById('page-slider').value = currentPage;
+            }
+        });
+
+        // Page slider
+        document.getElementById('page-slider').addEventListener('input', function() {
+            currentPage = parseInt(this.value);
+            renderPage(currentPage);
+            document.getElementById('page-num').textContent = `Page: ${currentPage} of ${numPages}`;
+        });
+    </script>
+</body>
+</html>
