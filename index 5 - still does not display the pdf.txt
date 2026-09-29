@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Viewer</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf_viewer.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf_viewer.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+    }
+
+    #toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    #pdf-container {
+      width: 100%;
+      height: 80vh;
+      overflow: auto;
+      border: 1px solid #ccc;
+      background: white;
+    }
+
+    .page-wrapper {
+      position: relative;
+      margin: 0 auto 12px auto;
+      display: inline-block;
+    }
+
+    canvas {
+      display: block;
+    }
+
+    .annotationLayer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 2;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="toolbar">
+    <button id="prev">Previous</button>
+    <span id="pageInfo">Page 1</span>
+    <button id="next">Next</button>
+    <input id="pageSlider" type="range" min="1" max="1" value="1" style="flex: 1;">
+  </div>
+
+  <div id="pdf-container"></div>
+
+  <script>
+    const pdfUrl = "filename.pdf";
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
+
+    const container = document.getElementById("pdf-container");
+    const pageInfo = document.getElementById("pageInfo");
+    const pageSlider = document.getElementById("pageSlider");
+
+    let pdfDoc = null;
+    let currentPage = 1;
+
+    const linkService = new pdfjsViewer.PDFLinkService();
+
+    pdfjsLib.getDocument(pdfUrl).promise.then(async (pdf) => {
+      pdfDoc = pdf;
+      linkService.setDocument(pdfDoc, null);
+      pageSlider.max = pdfDoc.numPages;
+      await renderPage(currentPage);
+    }).catch(err => {
+      console.error(err);
+      container.innerHTML = "<p style='color:red;'>Failed to load PDF</p>";
+    });
+
+    async function renderPage(pageNum) {
+      const page = await pdfDoc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.5 });
+
+      container.innerHTML = "";
+
+      const wrapper = document.createElement("div");
+      wrapper.className = "page-wrapper";
+      wrapper.style.width = viewport.width + "px";
+      wrapper.style.height = viewport.height + "px";
+
+      const canvas = document.createElement("canvas");
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+
+      const ctx = canvas.getContext("2d");
+
+      const annotationLayerDiv = document.createElement("div");
+      annotationLayerDiv.className = "annotationLayer";
+      annotationLayerDiv.style.width = viewport.width + "px";
+      annotationLayerDiv.style.height = viewport.height + "px";
+
+      wrapper.appendChild(canvas);
+      wrapper.appendChild(annotationLayerDiv);
+      container.appendChild(wrapper);
+
+      await page.render({
+        canvasContext: ctx,
+        viewport
+      }).promise;
+
+      const annotations = await page.getAnnotations({ intent: "display" });
+
+      pdfjsViewer.AnnotationLayer.render({
+        viewport,
+        div: annotationLayerDiv,
+        annotations,
+        page,
+        linkService,
+        downloadManager: null,
+        renderForms: false,
+        enableScripting: false
+      });
+
+      pageInfo.textContent = `Page ${pageNum} of ${pdfDoc.numPages}`;
+      pageSlider.value = pageNum;
+    }
+
+    document.getElementById("prev").addEventListener("click", () => {
+      if (currentPage > 1) {
+        currentPage--;
+        renderPage(currentPage);
+      }
+    });
+
+    document.getElementById("next").addEventListener("click", () => {
+      if (currentPage < pdfDoc.numPages) {
+        currentPage++;
+        renderPage(currentPage);
+      }
+    });
+
+    pageSlider.addEventListener("input", () => {
+      currentPage = parseInt(pageSlider.value, 10);
+      renderPage(currentPage);
+    });
+  </script>
+</body>
+</html>
