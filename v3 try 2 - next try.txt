@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>PDF + Photo Viewer</title>
+
   <style>
     html, body {
       margin: 0;
@@ -13,12 +14,16 @@
       background: #111;
     }
 
-    #pdfPane, #photoPane {
+    #app, #pdfPane, #photoPane {
       position: absolute;
       inset: 0;
     }
 
-    #pdfPane { background: #222; }
+    #pdfPane {
+      background: #222;
+      display: block;
+    }
+
     #pdfFrame {
       width: 100%;
       height: 100%;
@@ -31,22 +36,6 @@
       background: #000;
       color: #fff;
       z-index: 20;
-    }
-
-    #photoStage {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    #photoImg {
-      max-width: 100vw;
-      max-height: 100vh;
-      object-fit: contain;
-      user-select: none;
-      -webkit-user-drag: none;
     }
 
     #photoTopBar {
@@ -76,6 +65,24 @@
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
       backdrop-filter: blur(6px);
+    }
+
+    .btn:active { transform: scale(0.98); }
+
+    #photoStage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #photoImg {
+      max-width: 100vw;
+      max-height: 100vh;
+      object-fit: contain;
+      user-select: none;
+      -webkit-user-drag: none;
     }
 
     #leftArrow, #rightArrow {
@@ -124,30 +131,35 @@
   </style>
 </head>
 <body>
-  <div id="pdfPane">
-    <iframe id="pdfFrame" allow="fullscreen"></iframe>
-  </div>
-
-  <div id="photoPane">
-    <div id="photoTopBar">
-      <button class="btn" id="closeBtn" aria-label="Close photo viewer">×</button>
-      <button class="btn" id="fsBtn" aria-label="Toggle full screen">⤢</button>
+  <div id="app">
+    <div id="pdfPane">
+      <iframe id="pdfFrame" allow="fullscreen"></iframe>
     </div>
 
-    <button id="leftArrow" aria-label="Previous photo">‹</button>
-    <button id="rightArrow" aria-label="Next photo">›</button>
+    <div id="photoPane">
+      <div id="photoTopBar">
+        <button class="btn" id="closeBtn" aria-label="Close photo viewer">×</button>
+        <button class="btn" id="fsBtn" aria-label="Toggle full screen">⤢</button>
+      </div>
 
-    <div id="photoStage">
-      <img id="photoImg" alt="Photo viewer" />
+      <button id="leftArrow" aria-label="Previous photo">‹</button>
+      <button id="rightArrow" aria-label="Next photo">›</button>
+
+      <div id="photoStage">
+        <img id="photoImg" alt="Photo viewer" />
+      </div>
+
+      <div id="caption"></div>
+      <div id="loading">Loading…</div>
     </div>
-
-    <div id="caption"></div>
-    <div id="loading">Loading…</div>
   </div>
 
   <script>
-    const PDF_URL = "filename.pdf";
-    const REPO = "cottageclock/TEST-pdf_js-viewer";
+    // --------- CONFIG ----------
+    const PDF_URL = "filename.pdf"; // change if needed
+    const FOLDER_API_URL = "https://api.github.com/repos/cottageclock/TEST-pdf_js-viewer/contents/Photos%20folder/Lot%201%20-%20bridge%20scene%20glass%20IMG_4863";
+    const PHOTO_FOLDER_WEB_URL = "https://github.com/cottageclock/TEST-pdf_js-viewer/tree/main/Photos%20folder/Lot%201%20-%20bridge%20scene%20glass%20IMG_4863";
+    const RAW_BASE = "https://raw.githubusercontent.com/cottageclock/TEST-pdf_js-viewer/main/Photos%20folder/Lot%201%20-%20bridge%20scene%20glass%20IMG_4863/";
 
     const pdfPane = document.getElementById("pdfPane");
     const photoPane = document.getElementById("photoPane");
@@ -163,14 +175,8 @@
 
     let photos = [];
     let currentIndex = 0;
-    let rawBase = "";
 
     pdfFrame.src = PDF_URL;
-
-    function getFolderFromUrl() {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("folder");
-    }
 
     function showPdf() {
       photoPane.style.display = "none";
@@ -181,22 +187,29 @@
       if (!photos.length) return;
       currentIndex = (index + photos.length) % photos.length;
       const file = photos[currentIndex];
-      photoImg.src = rawBase + encodeURIComponent(file.name);
+      photoImg.src = RAW_BASE + encodeURIComponent(file.name);
       caption.textContent = `${currentIndex + 1} / ${photos.length} — ${file.name}`;
       photoPane.style.display = "block";
       pdfPane.style.display = "none";
     }
 
-    async function loadPhotos(folderPath) {
+    function nextPhoto() {
+      if (!photos.length) return;
+      showPhotos(currentIndex + 1);
+    }
+
+    function prevPhoto() {
+      if (!photos.length) return;
+      showPhotos(currentIndex - 1);
+    }
+
+    async function loadPhotos() {
       loading.style.display = "flex";
       try {
-        const apiUrl = `https://api.github.com/repos/${REPO}/contents/${folderPath}`;
-        rawBase = `https://raw.githubusercontent.com/${REPO}/main/${folderPath}/`;
-
-        const res = await fetch(apiUrl, {
+        const res = await fetch(FOLDER_API_URL, {
           headers: { "Accept": "application/vnd.github+json" }
         });
-        if (!res.ok) throw new Error("Could not load folder");
+        if (!res.ok) throw new Error("Could not load folder list");
 
         const data = await res.json();
         photos = data
@@ -209,15 +222,27 @@
       }
     }
 
-    async function openFolderFromUrl() {
-      const folder = getFolderFromUrl();
-      if (!folder) return;
-      await loadPhotos(folder);
-      showPhotos(0);
-    }
+    // If the PDF link is clicked and points to the folder, open the photo viewer.
+    // Works if your PDF is displayed through a PDF.js viewer or a browser that exposes link clicks.
+    window.addEventListener("message", (e) => {
+      const data = e.data || {};
+      if (data.type === "open-photo-folder" && data.url === PHOTO_FOLDER_WEB_URL) {
+        loadPhotos().then(() => showPhotos(0));
+      }
+    });
 
-    leftArrow.addEventListener("click", () => showPhotos(currentIndex - 1));
-    rightArrow.addEventListener("click", () => showPhotos(currentIndex + 1));
+    // Fallback: if you want to directly open the gallery from a normal hyperlink on the page.
+    // Example: <a href="#" data-photo-folder>Open photos</a>
+    document.addEventListener("click", async (e) => {
+      const a = e.target.closest("a[data-photo-folder]");
+      if (!a) return;
+      e.preventDefault();
+      await loadPhotos();
+      showPhotos(0);
+    });
+
+    leftArrow.addEventListener("click", prevPhoto);
+    rightArrow.addEventListener("click", nextPhoto);
     closeBtn.addEventListener("click", showPdf);
 
     fsBtn.addEventListener("click", async () => {
@@ -232,18 +257,17 @@
 
     document.addEventListener("keydown", (e) => {
       if (photoPane.style.display === "block") {
-        if (e.key === "ArrowLeft") showPhotos(currentIndex - 1);
-        if (e.key === "ArrowRight") showPhotos(currentIndex + 1);
+        if (e.key === "ArrowLeft") prevPhoto();
+        if (e.key === "ArrowRight") nextPhoto();
         if (e.key === "Escape") showPdf();
       }
     });
 
+    // Simple tap/click navigation on the image
     photoImg.addEventListener("click", (e) => {
-      if (e.clientX < window.innerWidth / 2) showPhotos(currentIndex - 1);
-      else showPhotos(currentIndex + 1);
+      if (e.clientX < window.innerWidth / 2) prevPhoto();
+      else nextPhoto();
     });
-
-    window.addEventListener("load", openFolderFromUrl);
   </script>
 </body>
 </html>
