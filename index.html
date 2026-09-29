@@ -86,7 +86,8 @@
     const prevBtn = document.getElementById("prev-page");
     const nextBtn = document.getElementById("next-page");
 
-    const linkService = new pdfjsLib.SimpleLinkService();
+    const linkService = new pdfjsLib.PDFLinkService();
+    linkService.externalLinkEnabled = true;
 
     function updateUI() {
       pageNumEl.textContent = `Page: ${currentPage} of ${numPages}`;
@@ -152,6 +153,7 @@
       pdfDoc = pdf;
       numPages = pdfDoc.numPages;
       sliderEl.max = numPages;
+
       linkService.setDocument(pdfDoc, null);
 
       updateUI();
