@@ -5,8 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PDF Viewer</title>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf_viewer.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf_viewer.min.js"></script>
 
   <style>
     body {
@@ -34,7 +35,7 @@
     .page-wrapper {
       position: relative;
       margin: 0 auto 12px auto;
-      display: block;
+      display: inline-block;
     }
 
     canvas {
@@ -43,8 +44,10 @@
 
     .annotationLayer {
       position: absolute;
-      inset: 0;
+      top: 0;
+      left: 0;
       z-index: 2;
+      pointer-events: auto;
     }
   </style>
 </head>
@@ -53,7 +56,7 @@
     <button id="prev">Previous</button>
     <span id="pageInfo">Page 1</span>
     <button id="next">Next</button>
-    <input id="pageSlider" type="range" min="1" max="1" value="1" style="flex: 1;" />
+    <input id="pageSlider" type="range" min="1" max="1" value="1" style="flex: 1;">
   </div>
 
   <div id="pdf-container"></div>
@@ -71,7 +74,7 @@
     let pdfDoc = null;
     let currentPage = 1;
 
-    const linkService = new pdfjsLib.PDFLinkService();
+    const linkService = new pdfjsViewer.PDFLinkService();
 
     pdfjsLib.getDocument(pdfUrl).promise.then(async (pdf) => {
       pdfDoc = pdf;
@@ -116,7 +119,7 @@
 
       const annotations = await page.getAnnotations({ intent: "display" });
 
-      pdfjsLib.AnnotationLayer.render({
+      pdfjsViewer.AnnotationLayer.render({
         viewport,
         div: annotationLayerDiv,
         annotations,
