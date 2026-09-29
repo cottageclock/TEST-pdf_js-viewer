@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PDF.js Viewer</title>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf_viewer.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
 
   <style>
@@ -43,17 +42,11 @@
       display: inline-block;
     }
 
-    canvas {
-      position: relative;
-      z-index: 1;
-      display: block;
-    }
-
     .annotationLayer {
       position: absolute;
       top: 0;
       left: 0;
-      z-index: 2;
+      pointer-events: auto;
     }
   </style>
 </head>
@@ -86,8 +79,7 @@
     const prevBtn = document.getElementById("prev-page");
     const nextBtn = document.getElementById("next-page");
 
-    const linkService = new pdfjsLib.PDFLinkService();
-    linkService.externalLinkEnabled = true;
+    const linkService = new pdfjsLib.SimpleLinkService();
 
     function updateUI() {
       pageNumEl.textContent = `Page: ${currentPage} of ${numPages}`;
@@ -116,6 +108,7 @@
       const canvas = document.createElement("canvas");
       canvas.width = viewport.width;
       canvas.height = viewport.height;
+      canvas.style.display = "block";
 
       const canvasContext = canvas.getContext("2d");
 
@@ -153,7 +146,6 @@
       pdfDoc = pdf;
       numPages = pdfDoc.numPages;
       sliderEl.max = numPages;
-
       linkService.setDocument(pdfDoc, null);
 
       updateUI();
