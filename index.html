@@ -1,164 +1,115 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PDF.js Viewer</title>
-
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-      background-color: #f4f4f4;
-    }
-
-    #pdf-toolbar {
-      margin-bottom: 10px;
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
-
-    button {
-      padding: 5px 10px;
-      cursor: pointer;
-    }
-
-    #pdf-container {
-      width: 100%;
-      height: 80vh;
-      border: 1px solid #ccc;
-      background-color: white;
-      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-      overflow: auto;
-      position: relative;
-    }
-
-    .page-wrapper {
-      position: relative;
-      display: inline-block;
-    }
-
-    .annotationLayer {
-      position: absolute;
-      top: 0;
-      left: 0;
-      pointer-events: auto;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF.js Viewer</title>
+    <!-- Load PDF.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        #pdf-container {
+            width: 100%;
+            height: 80vh;
+            border: 1px solid #ccc;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        #pdf-toolbar {
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        button {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
-  <h1>PDF.js Viewer</h1>
+    <h1>PDF.js Viewer</h1>
+    <div id="pdf-toolbar">
+        <button id="prev-page">Previous</button>
+        <span id="page-num">Page: 1</span>
+        <button id="next-page">Next</button>
+        <input type="range" id="page-slider" min="1" max="1" value="1" style="flex-grow: 1;">
+    </div>
+    <div id="pdf-container"></div>
 
-  <div id="pdf-toolbar">
-    <button id="prev-page">Previous</button>
-    <span id="page-num">Page: 1</span>
-    <button id="next-page">Next</button>
-    <input type="range" id="page-slider" min="1" max="1" value="1" style="flex-grow: 1;" />
-  </div>
+    <script>
+        // Initialize PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-  <div id="pdf-container"></div>
+        // Load the PDF
+        const pdfPath = 'filename.pdf'; // PDF file in the same folder
+        let pdfDoc = null;
+        let currentPage = 1;
+        let numPages = 0;
 
-  <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js";
+        // Load PDF document
+        pdfjsLib.getDocument(pdfPath).promise.then(function(pdf) {
+            pdfDoc = pdf;
+            numPages = pdfDoc.numPages;
+            document.getElementById('page-slider').max = numPages;
 
-    const pdfPath = "filename.pdf";
-    let pdfDoc = null;
-    let currentPage = 1;
-    let numPages = 0;
+            // Render the first page
+            renderPage(currentPage);
 
-    const container = document.getElementById("pdf-container");
-    const pageNumEl = document.getElementById("page-num");
-    const sliderEl = document.getElementById("page-slider");
+            // Update UI
+            document.getElementById('page-num').textContent = `Page: ${currentPage} of ${numPages}`;
+        }).catch(function(error) {
+            console.error("Error loading PDF:", error);
+            document.getElementById('pdf-container').innerHTML = `<p style="color: red;">Failed to load PDF. Error: ${error.message}</p>`;
+        });
 
-    const linkService = new pdfjsLib.SimpleLinkService();
+        // Render a specific page
+        function renderPage(pageNum) {
+            pdfDoc.getPage(pageNum).then(function(page) {
+                const viewport = page.getViewport({ scale: 1.5 });
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                document.getElementById('pdf-container').innerHTML = '';
+                document.getElementById('pdf-container').appendChild(canvas);
 
-    pdfjsLib.getDocument(pdfPath).promise.then(function (pdf) {
-      pdfDoc = pdf;
-      numPages = pdfDoc.numPages;
-      sliderEl.max = numPages;
-      linkService.setDocument(pdfDoc, null);
+                page.render({
+                    canvasContext: context,
+                    viewport: viewport
+                });
+            });
+        }
 
-      renderPage(currentPage);
-      pageNumEl.textContent = `Page: ${currentPage} of ${numPages}`;
-    }).catch(function (error) {
-      console.error("Error loading PDF:", error);
-      container.innerHTML = `<p style="color:red;">Failed to load PDF: ${error.message}</p>`;
-    });
+        // Navigation buttons
+        document.getElementById('prev-page').addEventListener('click', function() {
+            if (currentPage > 1) {
+                currentPage--;
+                renderPage(currentPage);
+                document.getElementById('page-num').textContent = `Page: ${currentPage} of ${numPages}`;
+                document.getElementById('page-slider').value = currentPage;
+            }
+        });
 
-    async function renderPage(pageNum) {
-      const page = await pdfDoc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: 1.5 });
+        document.getElementById('next-page').addEventListener('click', function() {
+            if (currentPage < numPages) {
+                currentPage++;
+                renderPage(currentPage);
+                document.getElementById('page-num').textContent = `Page: ${currentPage} of ${numPages}`;
+                document.getElementById('page-slider').value = currentPage;
+            }
+        });
 
-      container.innerHTML = "";
-
-      const pageWrapper = document.createElement("div");
-      pageWrapper.className = "page-wrapper";
-      pageWrapper.style.width = `${viewport.width}px`;
-      pageWrapper.style.height = `${viewport.height}px`;
-
-      const canvas = document.createElement("canvas");
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      canvas.style.display = "block";
-
-      const canvasContext = canvas.getContext("2d");
-
-      const annotationLayerDiv = document.createElement("div");
-      annotationLayerDiv.className = "annotationLayer";
-      annotationLayerDiv.style.width = `${viewport.width}px`;
-      annotationLayerDiv.style.height = `${viewport.height}px`;
-
-      pageWrapper.appendChild(canvas);
-      pageWrapper.appendChild(annotationLayerDiv);
-      container.appendChild(pageWrapper);
-
-      await page.render({
-        canvasContext: canvasContext,
-        viewport: viewport
-      }).promise;
-
-      const annotations = await page.getAnnotations({ intent: "display" });
-
-      pdfjsLib.AnnotationLayer.render({
-        viewport: viewport,
-        div: annotationLayerDiv,
-        annotations: annotations,
-        page: page,
-        linkService: linkService,
-        downloadManager: null,
-        renderForms: false,
-        enableScripting: false
-      });
-    }
-
-    document.getElementById("prev-page").addEventListener("click", function () {
-      if (currentPage > 1) {
-        currentPage--;
-        renderPage(currentPage);
-        pageNumEl.textContent = `Page: ${currentPage} of ${numPages}`;
-        sliderEl.value = currentPage;
-      }
-    });
-
-    document.getElementById("next-page").addEventListener("click", function () {
-      if (currentPage < numPages) {
-        currentPage++;
-        renderPage(currentPage);
-        pageNumEl.textContent = `Page: ${currentPage} of ${numPages}`;
-        sliderEl.value = currentPage;
-      }
-    });
-
-    sliderEl.addEventListener("input", function () {
-      currentPage = parseInt(this.value, 10);
-      renderPage(currentPage);
-      pageNumEl.textContent = `Page: ${currentPage} of ${numPages}`;
-    });
-  </script>
+        // Page slider
+        document.getElementById('page-slider').addEventListener('input', function() {
+            currentPage = parseInt(this.value);
+            renderPage(currentPage);
+            document.getElementById('page-num').textContent = `Page: ${currentPage} of ${numPages}`;
+        });
+    </script>
 </body>
 </html>
